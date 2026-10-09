@@ -1,0 +1,18 @@
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+
+# SQLite database (can be recreated anytime using python seed_data.py)
+*.db
+smartmeal.db
+
+# Editor & OS files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
