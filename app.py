@@ -535,6 +535,330 @@ def get_order_status(order_ref):
         }), 500
 
 
+# ---------------------------------------------------------
+# Milestone 4: Staff Dashboard Endpoints
+# ---------------------------------------------------------
+
+@app.route("/staff")
+def staff_dashboard():
+    """Renders the staff management dashboard."""
+    return render_template("staff.html")
+
+
+@app.route("/api/staff/orders", methods=["GET"])
+@require_staff_auth
+def get_staff_orders():
+    """
+    Returns canteen orders with complete student identity and line items for staff fulfillment.
+    Supports optional status filtering and search query.
+    """
+    status_filter = request.args.get("status", "").strip()
+    search_query = request.args.get("search", "").strip()
+
+    try:
+        conn = get_db_connection()
+        try:
+            sql = """
+                SELECT id, order_ref, student_name, roll_number, section, total_price, status, created_at, updated_at
+                FROM orders
+                WHERE 1=1
+            """
+            params = []
+            if status_filter and status_filter.lower() != "all":
+                sql += " AND LOWER(status) = LOWER(?)"
+                params.append(status_filter)
+
+            if search_query:
+                sql += " AND (order_ref LIKE ? OR roll_number LIKE ? OR student_name LIKE ?)"
+                like_term = f"%{search_query}%"
+                params.extend([like_term, like_term, like_term])
+
+            sql += " ORDER BY id DESC"
+            order_rows = conn.execute(sql, params).fetchall()
+
+            orders = []
+            for o in order_rows:
+                items_rows = conn.execute(
+                    """
+                    SELECT oi.id, oi.quantity, oi.unit_price, oi.cooking_preference, oi.special_request,
+                           mi.name AS item_name, mi.category
+                    FROM order_items oi
+                    JOIN menu_items mi ON oi.menu_item_id = mi.id
+                    WHERE oi.order_id = ?
+                    ORDER BY oi.id ASC;
+                    """,
+                    (o["id"],)
+                ).fetchall()
+
+                items = [
+                    {
+                        "item_name": ir["item_name"],
+                        "category": ir["category"],
+                        "quantity": ir["quantity"],
+                        "unit_price": float(ir["unit_price"]),
+                        "line_total": round(float(ir["unit_price"]) * ir["quantity"], 2),
+                        "cooking_preference": ir["cooking_preference"],
+                        "special_request": ir["special_request"]
+                    }
+                    for ir in items_rows
+                ]
+
+                orders.append({
+                    "id": o["id"],
+                    "order_ref": o["order_ref"],
+                    "student_name": o["student_name"],
+                    "roll_number": o["roll_number"],
+                    "section": o["section"],
+                    "total_price": float(o["total_price"]),
+                    "status": o["status"],
+                    "created_at": o["created_at"],
+                    "updated_at": o["updated_at"],
+                    "items": items
+                })
+
+            return jsonify({
+                "status": "success",
+                "count": len(orders),
+                "data": orders
+            }), 200
+        finally:
+            conn.close()
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to retrieve orders.",
+            "details": str(e)
+        }), 500
+
+
+# Allowed status lifecycle transitions
+VALID_TRANSITIONS = {
+    "Pending": ["Confirmed", "Cancelled"],
+    "Confirmed": ["Preparing", "Cancelled"],
+    "Preparing": ["Ready for Pickup", "Cancelled"],
+    "Ready for Pickup": ["Completed", "Cancelled"],
+    "Completed": [],
+    "Cancelled": []
+}
+
+
+@app.route("/api/staff/orders/<order_ref>/status", methods=["PATCH", "POST"])
+@require_staff_auth
+def update_order_status(order_ref):
+    """
+    Updates the lifecycle status of an order according to allowed workflow transitions:
+    Pending -> Confirmed -> Preparing -> Ready for Pickup -> Completed (or Cancelled).
+    Terminal statuses (Completed, Cancelled) cannot be modified.
+    """
+    ref = order_ref.strip().upper()
+    payload = request.get_json(silent=True) or {}
+    new_status = payload.get("status", "").strip()
+
+    if not new_status:
+        return jsonify({
+            "status": "error",
+            "message": "Target status is required."
+        }), 400
+
+    conn = get_db_connection()
+    try:
+        order = conn.execute("SELECT id, status FROM orders WHERE order_ref = ?;", (ref,)).fetchone()
+        if not order:
+            return jsonify({
+                "status": "error",
+                "message": f"Order reference '{ref}' not found."
+            }), 404
+
+        current_status = order["status"]
+        allowed_next = VALID_TRANSITIONS.get(current_status, [])
+        if new_status not in allowed_next:
+            return jsonify({
+                "status": "error",
+                "message": f"Invalid status transition from '{current_status}' to '{new_status}'. Allowed next statuses: {allowed_next}."
+            }), 400
+
+        with conn:
+            conn.execute(
+                """
+                UPDATE orders
+                SET status = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?;
+                """,
+                (new_status, order["id"])
+            )
+
+        return jsonify({
+            "status": "success",
+            "message": f"Order {ref} status updated from '{current_status}' to '{new_status}'.",
+            "data": {
+                "order_ref": ref,
+                "previous_status": current_status,
+                "status": new_status
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to update order status.",
+            "details": str(e)
+        }), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/staff/prep-summary", methods=["GET"])
+@require_staff_auth
+def get_prep_summary():
+    """
+    Returns aggregated quantities for each dish across all active orders.
+    Orders in terminal statuses ('Completed', 'Cancelled') are strictly excluded.
+    """
+    try:
+        conn = get_db_connection()
+        try:
+            rows = conn.execute(
+                """
+                SELECT mi.id, mi.name, mi.category, SUM(oi.quantity) as total_quantity
+                FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                JOIN menu_items mi ON oi.menu_item_id = mi.id
+                WHERE o.status NOT IN ('Completed', 'Cancelled')
+                GROUP BY mi.id, mi.name, mi.category
+                ORDER BY total_quantity DESC, mi.name ASC;
+                """
+            ).fetchall()
+
+            summary = [
+                {
+                    "item_id": r["id"],
+                    "item_name": r["name"],
+                    "category": r["category"],
+                    "total_quantity": r["total_quantity"]
+                }
+                for r in rows
+            ]
+
+            return jsonify({
+                "status": "success",
+                "count": len(summary),
+                "data": summary
+            }), 200
+        finally:
+            conn.close()
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to retrieve preparation summary.",
+            "details": str(e)
+        }), 500
+
+
+@app.route("/api/staff/menu", methods=["GET"])
+@require_staff_auth
+def get_staff_menu():
+    """
+    Returns complete menu catalog (both available and unavailable items) for staff management.
+    """
+    try:
+        conn = get_db_connection()
+        try:
+            rows = conn.execute(
+                """
+                SELECT id, name, category, price, is_available, max_portion_limit, allowed_preferences
+                FROM menu_items
+                ORDER BY category, id;
+                """
+            ).fetchall()
+
+            catalog = []
+            for r in rows:
+                try:
+                    prefs = json.loads(r["allowed_preferences"])
+                except Exception:
+                    prefs = []
+
+                catalog.append({
+                    "id": r["id"],
+                    "name": r["name"],
+                    "category": r["category"],
+                    "price": float(r["price"]),
+                    "is_available": r["is_available"],
+                    "max_portion_limit": r["max_portion_limit"],
+                    "allowed_preferences": prefs
+                })
+
+            return jsonify({
+                "status": "success",
+                "count": len(catalog),
+                "data": catalog
+            }), 200
+        finally:
+            conn.close()
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to retrieve menu catalog.",
+            "details": str(e)
+        }), 500
+
+
+@app.route("/api/staff/menu/<int:item_id>/availability", methods=["PATCH", "POST"])
+@require_staff_auth
+def update_item_availability(item_id):
+    """
+    Toggles or sets the availability flag for a menu item (1 = Available, 0 = Sold Out).
+    """
+    payload = request.get_json(silent=True) or {}
+    raw_val = payload.get("is_available")
+
+    if raw_val is None:
+        return jsonify({
+            "status": "error",
+            "message": "Field 'is_available' (0 or 1, or boolean) is required."
+        }), 400
+
+    if isinstance(raw_val, bool):
+        val = 1 if raw_val else 0
+    elif isinstance(raw_val, int) and raw_val in (0, 1):
+        val = raw_val
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "Field 'is_available' must be 0, 1, true, or false."
+        }), 400
+
+    conn = get_db_connection()
+    try:
+        item = conn.execute("SELECT id, name FROM menu_items WHERE id = ?;", (item_id,)).fetchone()
+        if not item:
+            return jsonify({
+                "status": "error",
+                "message": f"Menu item with ID {item_id} not found."
+            }), 404
+
+        with conn:
+            conn.execute("UPDATE menu_items SET is_available = ? WHERE id = ?;", (val, item_id))
+
+        status_str = "Available" if val == 1 else "Sold Out"
+        return jsonify({
+            "status": "success",
+            "message": f"'{item['name']}' is now marked as {status_str}.",
+            "data": {
+                "id": item_id,
+                "name": item["name"],
+                "is_available": val
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to update item availability.",
+            "details": str(e)
+        }), 500
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     init_db()
     app.run(debug=True, port=5000)
