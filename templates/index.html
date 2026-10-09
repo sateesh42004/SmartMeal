@@ -3,107 +3,282 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SmartMeal - A simple web application for reducing food waste in college hostels.">
-    <title>SmartMeal | Hostel Food Waste Reducer</title>
-    <!-- Link to external stylesheet -->
+    <meta name="description" content="SmartMeal - College Canteen Pre-Ordering System to reduce food waste and skip long queues.">
+    <title>SmartMeal | College Canteen Pre-Ordering</title>
+    <!-- External CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <header class="app-header">
-        <div class="header-container">
+    <!-- Top Navigation Header -->
+    <header class="navbar">
+        <div class="nav-container">
             <div class="brand">
-                <span class="brand-icon" aria-hidden="true">🍲</span>
-                <div>
+                <span class="brand-icon" aria-hidden="true">🍱</span>
+                <div class="brand-text">
                     <h1 class="brand-title">SmartMeal</h1>
-                    <p class="brand-tagline">Share surplus hostel food. Cut down food waste.</p>
+                    <span class="brand-tagline">Canteen Pre-Orders & Waste Reducer</span>
                 </div>
             </div>
+
+            <!-- Navigation Mode Switcher -->
+            <nav class="nav-links" aria-label="Main Navigation">
+                <button type="button" id="tab-order-btn" class="nav-tab active" aria-selected="true">
+                    🍽️ Menu & Order
+                </button>
+                <button type="button" id="tab-track-btn" class="nav-tab" aria-selected="false">
+                    🔍 Track Order
+                </button>
+                <a href="#cart-section" id="mobile-cart-btn" class="nav-cart-badge" aria-label="View Cart">
+                    🛒 Cart (<span id="cart-count-badge">0</span>)
+                </a>
+            </nav>
         </div>
     </header>
 
-    <main class="main-container">
-        <!-- Left Column: Add Surplus Food Form -->
-        <section class="card form-card" aria-labelledby="form-heading">
-            <h2 id="form-heading" class="card-title">Share Surplus Food</h2>
-            <p class="card-subtitle">Got extra edible food after dinner or a celebration? Post it so hostel mates can claim it!</p>
+    <!-- Main Container -->
+    <main class="page-container">
 
-            <!-- Status banner for user notifications -->
-            <div id="form-status" class="status-banner" role="alert" aria-live="polite" hidden></div>
-
-            <form id="add-food-form" novalidate>
-                <div class="form-group">
-                    <label for="food-name">Food Name <span class="required">*</span></label>
-                    <input 
-                        type="text" 
-                        id="food-name" 
-                        name="food_name" 
-                        placeholder="e.g., Paneer Rice, Veg Sandwiches" 
-                        maxlength="100" 
-                        required
-                    >
-                    <small class="helper-text">Max 100 characters</small>
+        <!-- ============================================================
+             SECTION 1: ORDERING VIEW (MENU + CART)
+             ============================================================ -->
+        <section id="ordering-view" class="view-panel active">
+            <!-- Notice Banner -->
+            <div class="hero-banner">
+                <div class="hero-content">
+                    <h2>Skip the Canteen Rush</h2>
+                    <p>Pre-order freshly prepared hostel/canteen meals. Cooked fresh, zero food wasted.</p>
                 </div>
-
-                <div class="form-group">
-                    <label for="quantity">Quantity <span class="required">*</span></label>
-                    <input 
-                        type="text" 
-                        id="quantity" 
-                        name="quantity" 
-                        placeholder="e.g., 3 lunch boxes, 4 plates, 2 kg" 
-                        maxlength="50" 
-                        required
-                    >
-                    <small class="helper-text">Include units or portions (Max 50 characters)</small>
+                <div class="hero-meta">
+                    <span class="badge badge-info">⚡ Live Canteen Catalog</span>
+                    <span class="badge badge-neutral">🕒 Fast Pickup</span>
                 </div>
-
-                <div class="form-group">
-                    <label for="location">Pickup Location <span class="required">*</span></label>
-                    <input 
-                        type="text" 
-                        id="location" 
-                        name="location" 
-                        placeholder="e.g., Hostel Block B - Room 204, Mess Hall 1" 
-                        maxlength="100" 
-                        required
-                    >
-                    <small class="helper-text">Specify block and room or common area (Max 100 characters)</small>
-                </div>
-
-                <button type="submit" id="submit-btn" class="btn btn-primary">
-                    <span id="btn-text">Share Food Now</span>
-                    <span id="btn-spinner" class="spinner" hidden aria-hidden="true"></span>
-                </button>
-            </form>
-        </section>
-
-        <!-- Right Column: Available Food Listings -->
-        <section class="card feed-card" aria-labelledby="feed-heading">
-            <div class="feed-header">
-                <div>
-                    <h2 id="feed-heading" class="card-title">Available Food</h2>
-                    <p class="card-subtitle">Items currently up for grabs in the hostel.</p>
-                </div>
-                <button type="button" id="refresh-btn" class="btn btn-secondary" title="Refresh list">
-                    🔄 Refresh
-                </button>
             </div>
 
-            <!-- Feed status message (loading/error) -->
-            <div id="feed-status" class="status-banner" role="alert" aria-live="polite" hidden></div>
+            <!-- Two-Column Layout (Menu on Left, Cart on Right) -->
+            <div class="order-layout">
+                <!-- Left Column: Menu Catalog -->
+                <div class="menu-column">
+                    <div class="menu-controls">
+                        <!-- Category Filter Pills -->
+                        <div class="category-filters" id="category-filters" role="group" aria-label="Menu Categories">
+                            <button type="button" class="filter-pill active" data-category="All">All Items</button>
+                            <button type="button" class="filter-pill" data-category="Breakfast">Breakfast</button>
+                            <button type="button" class="filter-pill" data-category="Lunch">Lunch</button>
+                            <button type="button" class="filter-pill" data-category="Snacks">Snacks</button>
+                            <button type="button" class="filter-pill" data-category="Beverages">Beverages</button>
+                        </div>
 
-            <!-- Dynamic Food Cards Container -->
-            <div id="food-list" class="food-list" aria-live="polite">
-                <!-- Food items will be dynamically injected here by app.js -->
+                        <!-- Live Search Bar -->
+                        <div class="search-wrapper">
+                            <input 
+                                type="search" 
+                                id="menu-search-input" 
+                                placeholder="Search dishes (e.g., Dosa, Rice, Chai)..." 
+                                aria-label="Search menu items"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Menu Status / Error Feedback -->
+                    <div id="menu-status" class="alert-banner" role="alert" hidden></div>
+
+                    <!-- Dynamic Menu Grid -->
+                    <div id="menu-grid" class="menu-grid" aria-live="polite">
+                        <!-- Skeletons loaded via JS until API responds -->
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading fresh canteen menu...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Student Details & Cart -->
+                <aside class="cart-column" id="cart-section" aria-label="Your Order Cart">
+                    <div class="card cart-card">
+                        <div class="cart-header">
+                            <h3>🛒 Your Order</h3>
+                            <button type="button" id="clear-cart-btn" class="btn-text-danger" title="Clear all items">
+                                Clear
+                            </button>
+                        </div>
+
+                        <!-- Student Details Form -->
+                        <form id="order-form" novalidate>
+                            <fieldset class="student-info-fieldset">
+                                <legend class="section-legend">Student Information</legend>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="student-name">Full Name <span class="required">*</span></label>
+                                        <input 
+                                            type="text" 
+                                            id="student-name" 
+                                            name="student_name" 
+                                            placeholder="e.g. Arjun Sharma" 
+                                            maxlength="100" 
+                                            required
+                                        >
+                                    </div>
+                                </div>
+                                <div class="form-row two-col">
+                                    <div class="form-group">
+                                        <label for="roll-number">Roll Number <span class="required">*</span></label>
+                                        <input 
+                                            type="text" 
+                                            id="roll-number" 
+                                            name="roll_number" 
+                                            placeholder="e.g. 21BCE1045" 
+                                            maxlength="50" 
+                                            required
+                                        >
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="section-name">Section <span class="required">*</span></label>
+                                        <input 
+                                            type="text" 
+                                            id="section-name" 
+                                            name="section" 
+                                            placeholder="e.g. CSE-A" 
+                                            maxlength="20" 
+                                            required
+                                        >
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <!-- Cart Items List Container -->
+                            <div class="cart-items-wrapper">
+                                <div class="section-legend">Selected Dishes</div>
+                                <div id="cart-items-container" class="cart-items-list" aria-live="polite">
+                                    <!-- Dynamic Cart items injected here -->
+                                    <div class="empty-cart-state">
+                                        <span class="empty-cart-icon">🍽️</span>
+                                        <p>Your cart is empty.</p>
+                                        <small>Pick items from the menu on the left to start your order.</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Cart Calculation Summary -->
+                            <div class="cart-summary">
+                                <div class="summary-line">
+                                    <span>Total Items</span>
+                                    <span id="summary-items-count">0</span>
+                                </div>
+                                <div class="summary-line total-line">
+                                    <span>Estimated Total</span>
+                                    <span id="summary-estimated-total">Rs. 0.00</span>
+                                </div>
+                                <small class="summary-disclaimer">
+                                    * Final total is calculated & verified securely by the server.
+                                </small>
+                            </div>
+
+                            <!-- Form Status Banner (Errors / Notices) -->
+                            <div id="order-form-status" class="alert-banner" role="alert" hidden></div>
+
+                            <!-- Place Order Button -->
+                            <button type="submit" id="place-order-btn" class="btn btn-primary btn-block" disabled>
+                                <span id="place-order-btn-text">Confirm & Place Order</span>
+                                <span id="place-order-spinner" class="spinner-small" hidden aria-hidden="true"></span>
+                            </button>
+                        </form>
+                    </div>
+                </aside>
             </div>
         </section>
+
+        <!-- ============================================================
+             SECTION 2: TRACK ORDER VIEW
+             ============================================================ -->
+        <section id="tracking-view" class="view-panel" hidden>
+            <div class="card tracking-card">
+                <div class="tracking-header">
+                    <h2>🔍 Track Your Canteen Order</h2>
+                    <p>Enter your unique order reference code (e.g. <code>SM-39B693BB</code>) to view preparation and pickup status.</p>
+                </div>
+
+                <!-- Tracking Form -->
+                <form id="track-order-form" class="track-form" novalidate>
+                    <div class="track-input-group">
+                        <input 
+                            type="text" 
+                            id="track-ref-input" 
+                            placeholder="Enter Order Reference (e.g. SM-39B693BB)" 
+                            maxlength="20" 
+                            required
+                        >
+                        <button type="submit" id="track-btn" class="btn btn-primary">
+                            <span id="track-btn-text">Check Status</span>
+                            <span id="track-spinner" class="spinner-small" hidden aria-hidden="true"></span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Tracking Status Banner (for errors/loading) -->
+                <div id="track-status-alert" class="alert-banner" role="alert" hidden></div>
+
+                <!-- Order Details Card (Populated dynamically) -->
+                <div id="track-result-container" class="track-result-wrapper" hidden>
+                    <!-- Injected by student.js -->
+                </div>
+            </div>
+        </section>
+
     </main>
 
+    <!-- ============================================================
+         ORDER CONFIRMATION MODAL / POPUP
+         ============================================================ -->
+    <div id="order-modal-backdrop" class="modal-backdrop" hidden>
+        <div class="modal-card" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+            <div class="modal-header">
+                <div class="modal-icon-success">✅</div>
+                <h3 id="modal-title">Order Confirmed!</h3>
+                <p>Your meal order has been securely received by the canteen staff.</p>
+            </div>
+
+            <div class="modal-body">
+                <div class="order-ref-box">
+                    <span class="ref-label">Your Order Reference Code</span>
+                    <strong id="confirmed-ref-code" class="ref-code">SM-00000000</strong>
+                    <button type="button" id="copy-ref-btn" class="btn btn-sm btn-outline">
+                        📋 Copy Code
+                    </button>
+                </div>
+
+                <div class="order-meta-box">
+                    <div class="meta-row">
+                        <span>Current Status:</span>
+                        <span class="status-pill status-pending" id="confirmed-status-pill">Pending</span>
+                    </div>
+                    <div class="meta-row">
+                        <span>Verified Total:</span>
+                        <strong id="confirmed-total-amount">Rs. 0.00</strong>
+                    </div>
+                </div>
+
+                <p class="pickup-instruction">
+                    💡 Please save or note this reference code. You will need it to collect your meal when ready.
+                </p>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" id="modal-track-btn" class="btn btn-primary">
+                    Track This Order Now
+                </button>
+                <button type="button" id="modal-close-btn" class="btn btn-secondary">
+                    Order More Items
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
     <footer class="app-footer">
-        <p>Built for Campus Sustainability &bull; SmartMeal Project</p>
+        <p>SmartMeal &bull; College Canteen Pre-Ordering & Waste Reduction System &bull; Local Demo</p>
     </footer>
 
-    <!-- Link to client-side JavaScript -->
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <!-- Client-Side JavaScript -->
+    <script src="{{ url_for('static', filename='js/student.js') }}"></script>
 </body>
 </html>

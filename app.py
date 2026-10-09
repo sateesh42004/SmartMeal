@@ -3,7 +3,7 @@ import os
 import sqlite3
 import uuid
 from functools import wraps
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, render_template
 
 app = Flask(__name__)
 
@@ -126,13 +126,8 @@ def require_staff_auth(f):
 # ---------------------------------------------------------
 @app.route("/")
 def home():
-    """Root info page."""
-    return jsonify({
-        "project": "SmartMeal - College Canteen Pre-Ordering System",
-        "milestones": "1 & 2 Active - Student Ordering Backend Ready",
-        "status": "online",
-        "demo_staff_pin": "canteen123"
-    }), 200
+    """Renders student-facing ordering and tracking interface."""
+    return render_template("index.html")
 
 
 @app.route("/api/health", methods=["GET"])
