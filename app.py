@@ -706,6 +706,56 @@ def update_order_status(order_ref):
         conn.close()
 
 
+@app.route("/api/staff/stats", methods=["GET"])
+@require_staff_auth
+def get_staff_stats():
+    """
+    Calculates live dashboard statistics directly from SQLite:
+    - total_orders: Count of all orders placed in the system.
+    - pending_orders: Count of orders currently in 'Pending' status.
+    - completed_orders: Count of orders currently in 'Completed' status.
+    - today_sales: Sum of total_price for orders placed today (server local date), excluding 'Cancelled' orders.
+      Note: This represents gross order value, not confirmed payment gateway revenue, as online payments are not implemented.
+    - server_date: Current local date of the server (YYYY-MM-DD).
+    - sales_disclaimer: Clarification regarding order value vs payment gateway revenue.
+    """
+    try:
+        conn = get_db_connection()
+        try:
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_orders,
+                    COALESCE(SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END), 0) AS pending_orders,
+                    COALESCE(SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END), 0) AS completed_orders,
+                    COALESCE(SUM(CASE WHEN DATE(created_at, 'localtime') = DATE('now', 'localtime') AND status != 'Cancelled' THEN total_price ELSE 0.0 END), 0.0) AS today_sales
+                FROM orders;
+                """
+            ).fetchone()
+
+            server_date = conn.execute("SELECT DATE('now', 'localtime');").fetchone()[0]
+
+            return jsonify({
+                "status": "success",
+                "data": {
+                    "total_orders": int(row["total_orders"]),
+                    "pending_orders": int(row["pending_orders"]),
+                    "completed_orders": int(row["completed_orders"]),
+                    "today_sales": round(float(row["today_sales"]), 2),
+                    "server_date": server_date,
+                    "sales_disclaimer": "Order value based on non-cancelled orders placed today. Online payment gateway is not integrated."
+                }
+            }), 200
+        finally:
+            conn.close()
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to calculate staff statistics.",
+            "details": str(e)
+        }), 500
+
+
 @app.route("/api/staff/prep-summary", methods=["GET"])
 @require_staff_auth
 def get_prep_summary():

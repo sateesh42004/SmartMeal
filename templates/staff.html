@@ -93,6 +93,54 @@
                 </div>
             </div>
 
+            <!-- Milestone 5B: Live Canteen Statistics Cards -->
+            <section class="staff-stats-grid" aria-label="Canteen Key Statistics">
+                <!-- 1. Total Orders -->
+                <div class="stat-card" id="card-total-orders">
+                    <div class="stat-card-header">
+                        <span class="stat-icon stat-icon-total" aria-hidden="true">📦</span>
+                        <span class="stat-label">Total Orders</span>
+                    </div>
+                    <div class="stat-value" id="stat-total-orders">0</div>
+                    <span class="stat-subtext">All-time placed orders</span>
+                </div>
+
+                <!-- 2. Pending Orders -->
+                <div class="stat-card" id="card-pending-orders">
+                    <div class="stat-card-header">
+                        <span class="stat-icon stat-icon-pending" aria-hidden="true">⏳</span>
+                        <span class="stat-label">Pending Orders</span>
+                    </div>
+                    <div class="stat-value text-pending" id="stat-pending-orders">0</div>
+                    <span class="stat-subtext">Awaiting kitchen confirmation</span>
+                </div>
+
+                <!-- 3. Completed Orders -->
+                <div class="stat-card" id="card-completed-orders">
+                    <div class="stat-card-header">
+                        <span class="stat-icon stat-icon-completed" aria-hidden="true">✅</span>
+                        <span class="stat-label">Completed Orders</span>
+                    </div>
+                    <div class="stat-value text-completed" id="stat-completed-orders">0</div>
+                    <span class="stat-subtext">Successfully fulfilled</span>
+                </div>
+
+                <!-- 4. Today's Sales -->
+                <div class="stat-card stat-card-sales" id="card-today-sales">
+                    <div class="stat-card-header">
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <span class="stat-icon stat-icon-sales" aria-hidden="true">💰</span>
+                            <span class="stat-label">Today's Sales</span>
+                        </div>
+                        <span class="stat-badge-today" id="stat-server-date" title="Server local date">Today</span>
+                    </div>
+                    <div class="stat-value text-sales" id="stat-today-sales">Rs. 0.00</div>
+                    <div class="stat-disclaimer" id="stat-sales-disclaimer" title="Calculated from non-cancelled orders placed today. Online payment gateway is not integrated.">
+                        * Order value today (excl. cancelled). Online payments not integrated.
+                    </div>
+                </div>
+            </section>
+
             <!-- Tab Navigation Switcher -->
             <nav class="staff-nav-tabs" role="tablist" aria-label="Staff Dashboard Tabs">
                 <button type="button" id="tab-btn-orders" class="staff-nav-tab active" role="tab" aria-selected="true" aria-controls="section-orders">

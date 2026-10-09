@@ -1111,6 +1111,117 @@ body {
     gap: 0.75rem;
 }
 
+/* Milestone 5B: Staff Dashboard Statistics Cards */
+.staff-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.15rem;
+    margin-bottom: 1.75rem;
+}
+
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1.15rem 1.25rem;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.stat-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.stat-icon-total {
+    background: #f1f5f9;
+}
+
+.stat-icon-pending {
+    background: #fef3c7;
+}
+
+.stat-icon-completed {
+    background: #dcfce7;
+}
+
+.stat-icon-sales {
+    background: #e0f2fe;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.15;
+    margin-bottom: 0.25rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-value.text-pending {
+    color: #d97706;
+}
+
+.stat-value.text-completed {
+    color: #15803d;
+}
+
+.stat-value.text-sales {
+    color: #0369a1;
+}
+
+.stat-subtext {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.stat-badge-today {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 9999px;
+    margin-left: auto;
+}
+
+.stat-disclaimer {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.35rem;
+    line-height: 1.25;
+}
+
 .staff-nav-tabs {
     display: flex;
     gap: 0.5rem;

@@ -35,6 +35,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const staffRefreshBtn = document.getElementById("staff-refresh-btn");
     const staffActionAlert = document.getElementById("staff-action-alert");
 
+    // Milestone 5B: Statistics Cards
+    const statTotalOrders = document.getElementById("stat-total-orders");
+    const statPendingOrders = document.getElementById("stat-pending-orders");
+    const statCompletedOrders = document.getElementById("stat-completed-orders");
+    const statTodaySales = document.getElementById("stat-today-sales");
+    const statServerDate = document.getElementById("stat-server-date");
+    const statSalesDisclaimer = document.getElementById("stat-sales-disclaimer");
+
     // Tabs
     const tabBtnOrders = document.getElementById("tab-btn-orders");
     const tabBtnPrep = document.getElementById("tab-btn-prep");
@@ -228,6 +236,10 @@ document.addEventListener("DOMContentLoaded", () => {
         ordersList = [];
         prepSummaryList = [];
         menuCatalog = [];
+        if (statTotalOrders) statTotalOrders.textContent = "0";
+        if (statPendingOrders) statPendingOrders.textContent = "0";
+        if (statCompletedOrders) statCompletedOrders.textContent = "0";
+        if (statTodaySales) statTodaySales.textContent = "Rs. 0.00";
     });
 
     // -------------------------------------------------------------
@@ -236,6 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function refreshAll() {
         hideAlert(staffActionAlert);
         await Promise.all([
+            loadStats(),
             loadOrders(),
             loadPrepSummary(),
             loadMenuCatalog()
@@ -492,8 +505,9 @@ document.addEventListener("DOMContentLoaded", () => {
             showAlert(staffActionAlert, `Order ${orderRef} updated to '${targetStatus}'.`, "success");
             setTimeout(() => hideAlert(staffActionAlert), 3000);
 
-            // Refresh state to update board, active counter, and prep summary
+            // Refresh state to update board, active counter, prep summary, and statistics
             await Promise.all([
+                loadStats(),
                 loadOrders(),
                 loadPrepSummary()
             ]);
@@ -504,6 +518,41 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.textContent = originalText;
         }
     });
+
+    // -------------------------------------------------------------
+    // 1B. Staff Dashboard Statistics (Milestone 5B)
+    // -------------------------------------------------------------
+    async function loadStats() {
+        try {
+            const res = await fetch("/api/staff/stats", {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+
+            if (!res.ok) {
+                console.error("Failed to fetch staff statistics: HTTP", res.status);
+                return;
+            }
+
+            const result = await res.json();
+            const stats = result.data || {};
+
+            if (statTotalOrders) statTotalOrders.textContent = (stats.total_orders ?? 0).toLocaleString();
+            if (statPendingOrders) statPendingOrders.textContent = (stats.pending_orders ?? 0).toLocaleString();
+            if (statCompletedOrders) statCompletedOrders.textContent = (stats.completed_orders ?? 0).toLocaleString();
+            if (statTodaySales) statTodaySales.textContent = formatCurrency(stats.today_sales ?? 0);
+            if (statServerDate && stats.server_date) statServerDate.textContent = stats.server_date;
+            if (statSalesDisclaimer && stats.sales_disclaimer) {
+                statSalesDisclaimer.title = stats.sales_disclaimer;
+            }
+        } catch (err) {
+            console.error("Staff stats fetch error:", err);
+            if (statTotalOrders && !statTotalOrders.textContent) statTotalOrders.textContent = "0";
+            if (statPendingOrders && !statPendingOrders.textContent) statPendingOrders.textContent = "0";
+            if (statCompletedOrders && !statCompletedOrders.textContent) statCompletedOrders.textContent = "0";
+            if (statTodaySales && !statTodaySales.textContent) statTodaySales.textContent = "Rs. 0.00";
+        }
+    }
 
     // -------------------------------------------------------------
     // 2. Kitchen Preparation Summary
