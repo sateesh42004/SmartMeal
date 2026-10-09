@@ -13,6 +13,13 @@ document.addEventListener("DOMContentLoaded", () => {
     let searchQuery = "";          // Current search filter
     const cart = new Map();        // Map of menu_item_id -> cartItem object
 
+    // Milestone 5A Tracking Polling State
+    let currentTrackedRef = null;
+    let trackingPollTimer = null;
+    let isPollingInProgress = false;
+    const TRACKING_POLL_INTERVAL_MS = 5000;
+    const ORDER_STATUS_STEPS = ["Pending", "Confirmed", "Preparing", "Ready for Pickup", "Completed"];
+
     // -------------------------------------------------------------
     // DOM Element References
     // -------------------------------------------------------------
@@ -122,6 +129,11 @@ document.addEventListener("DOMContentLoaded", () => {
             tabOrderBtn.classList.remove("active");
             tabTrackBtn.setAttribute("aria-selected", "true");
             tabOrderBtn.setAttribute("aria-selected", "false");
+
+            // Resume polling if an active order is currently on screen
+            if (currentTrackedRef && !trackResultContainer.hidden) {
+                startTrackingPolling(currentTrackedRef);
+            }
         } else {
             trackingView.classList.remove("active");
             trackingView.hidden = true;
@@ -131,6 +143,9 @@ document.addEventListener("DOMContentLoaded", () => {
             tabTrackBtn.classList.remove("active");
             tabOrderBtn.setAttribute("aria-selected", "true");
             tabTrackBtn.setAttribute("aria-selected", "false");
+
+            // Stop automatic polling when tracking view is closed
+            stopTrackingPolling();
         }
     }
 
@@ -608,15 +623,41 @@ document.addEventListener("DOMContentLoaded", () => {
             trackRefInput.focus();
             return;
         }
-        fetchOrderStatus(ref);
+        fetchOrderStatus(ref, false);
     });
 
-    async function fetchOrderStatus(orderRef) {
-        hideAlert(trackStatusAlert);
-        trackResultContainer.hidden = true;
-        trackBtn.disabled = true;
-        trackBtnText.textContent = "Checking...";
-        trackSpinner.hidden = false;
+    function startTrackingPolling(ref) {
+        stopTrackingPolling();
+        currentTrackedRef = ref;
+        trackingPollTimer = setInterval(() => {
+            // Stop if tracking view was hidden or ref was cleared
+            if (trackingView.hidden || !currentTrackedRef) {
+                stopTrackingPolling();
+                return;
+            }
+            fetchOrderStatus(currentTrackedRef, true);
+        }, TRACKING_POLL_INTERVAL_MS);
+    }
+
+    function stopTrackingPolling() {
+        if (trackingPollTimer) {
+            clearInterval(trackingPollTimer);
+            trackingPollTimer = null;
+        }
+    }
+
+    async function fetchOrderStatus(orderRef, isAutoRefresh = false) {
+        // Prevent overlapping requests
+        if (isPollingInProgress) return;
+        isPollingInProgress = true;
+
+        if (!isAutoRefresh) {
+            hideAlert(trackStatusAlert);
+            trackResultContainer.hidden = true;
+            trackBtn.disabled = true;
+            trackBtnText.textContent = "Checking...";
+            trackSpinner.hidden = false;
+        }
 
         try {
             const response = await fetch(`/api/orders/${encodeURIComponent(orderRef)}`, {
@@ -627,19 +668,48 @@ document.addEventListener("DOMContentLoaded", () => {
             const result = await response.json();
 
             if (!response.ok) {
-                showAlert(trackStatusAlert, result.message || `No order found with reference '${orderRef}'.`, "error");
+                if (!isAutoRefresh) {
+                    showAlert(trackStatusAlert, result.message || `No order found with reference '${orderRef}'.`, "error");
+                    stopTrackingPolling();
+                    currentTrackedRef = null;
+                }
                 return;
             }
 
             const data = result.data;
+            currentTrackedRef = data.order_ref;
             renderTrackResult(data);
+
+            // Stop polling when reaching terminal statuses (Completed or Cancelled)
+            if (data.status === "Completed" || data.status === "Cancelled") {
+                stopTrackingPolling();
+            } else {
+                // Ensure polling continues every 5s while tracking is open
+                if (!trackingView.hidden && !trackingPollTimer) {
+                    startTrackingPolling(data.order_ref);
+                }
+            }
         } catch (err) {
             console.error("Tracking error:", err);
-            showAlert(trackStatusAlert, "Network error: Unable to reach canteen server.", "error");
+            if (!isAutoRefresh) {
+                showAlert(trackStatusAlert, "Network error: Unable to reach canteen server.", "error");
+                stopTrackingPolling();
+                currentTrackedRef = null;
+            } else {
+                // Background poll failed gracefully without breaking visible view
+                const timeEl = document.getElementById("last-updated-timestamp");
+                if (timeEl) {
+                    timeEl.textContent = "Connection issue, retrying in 5s...";
+                    timeEl.style.color = "#ef4444";
+                }
+            }
         } finally {
-            trackBtn.disabled = false;
-            trackBtnText.textContent = "Check Status";
-            trackSpinner.hidden = true;
+            isPollingInProgress = false;
+            if (!isAutoRefresh) {
+                trackBtn.disabled = false;
+                trackBtnText.textContent = "Check Status";
+                trackSpinner.hidden = true;
+            }
         }
     }
 
@@ -649,6 +719,78 @@ document.addEventListener("DOMContentLoaded", () => {
         const statusClass = getStatusClass(data.status);
         const formattedDate = new Date(data.created_at ? data.created_at.replace(" ", "T") + "Z" : Date.now())
             .toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+        const isTerminal = data.status === "Completed" || data.status === "Cancelled";
+        const isCancelled = data.status === "Cancelled";
+
+        // Step progression visualization
+        let progressionHtml = "";
+        if (isCancelled) {
+            progressionHtml = `
+                <div class="cancelled-order-banner">
+                    <span style="font-size:1.3rem;">🛑</span>
+                    <div>
+                        <strong>Order Cancelled</strong>
+                        <div style="font-size:0.8rem; font-weight:400; opacity:0.9;">
+                            This order was cancelled by canteen staff or student. Automatic updates stopped.
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            const stepIcons = {
+                "Pending": "📝",
+                "Confirmed": "👍",
+                "Preparing": "🍳",
+                "Ready for Pickup": "🔔",
+                "Completed": "🎉"
+            };
+
+            const currentIdx = ORDER_STATUS_STEPS.indexOf(data.status);
+            const activeIdx = currentIdx >= 0 ? currentIdx : 0;
+            const fillPercent = Math.max(0, Math.min(100, (activeIdx / (ORDER_STATUS_STEPS.length - 1)) * 100));
+
+            const stepsHtml = ORDER_STATUS_STEPS.map((step, idx) => {
+                let stateClass = "upcoming";
+                let bubbleContent = stepIcons[step] || (idx + 1);
+
+                if (idx < activeIdx) {
+                    stateClass = "completed";
+                    bubbleContent = "✓";
+                } else if (idx === activeIdx) {
+                    stateClass = "current";
+                    if (step === "Completed") bubbleContent = "🎉";
+                }
+
+                return `
+                    <div class="progress-step ${stateClass}">
+                        <div class="step-bubble">${bubbleContent}</div>
+                        <span class="step-label">${step}</span>
+                    </div>
+                `;
+            }).join("");
+
+            progressionHtml = `
+                <div class="order-progress-bar" aria-label="Order Status Progression">
+                    <div class="progress-steps-wrapper">
+                        <div class="progress-connector">
+                            <div class="progress-connector-fill" style="width: ${fillPercent}%;"></div>
+                        </div>
+                        <div class="progress-steps">
+                            ${stepsHtml}
+                        </div>
+                    </div>
+                    <div class="auto-refresh-indicator">
+                        <span>
+                            ${isTerminal 
+                                ? '🎉 <strong>Order Completed & Collected!</strong> Automatic polling stopped.' 
+                                : '<span class="refresh-pulse"></span>Live Status: Auto-refreshing every 5s'}
+                        </span>
+                        <span id="last-updated-timestamp">Updated: ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                    </div>
+                </div>
+            `;
+        }
 
         const itemsRowsHtml = (data.items || []).map(item => {
             const safeItemName = sanitize(item.item_name);
@@ -676,6 +818,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <span class="status-pill ${statusClass}">${safeStatus}</span>
             </div>
+
+            <!-- Progression Stepper (Pending -> Confirmed -> Preparing -> Ready for Pickup -> Completed) -->
+            ${progressionHtml}
 
             <div class="track-result-meta">
                 <span>Placed on: ${formattedDate}</span>

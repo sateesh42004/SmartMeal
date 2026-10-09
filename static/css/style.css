@@ -1462,6 +1462,151 @@ body {
     background: #dcfce7;
 }
 
+/* ============================================================
+   ORDER STATUS PROGRESSION STEPPER (Milestone 5A)
+   ============================================================ */
+.order-progress-bar {
+    margin: 1.25rem 0 1.5rem 0;
+    padding: 1.2rem 1rem 0.85rem 1rem;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.progress-steps-wrapper {
+    position: relative;
+}
+
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+    z-index: 2;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    flex: 1;
+}
+
+.step-bubble {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: var(--text-muted);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    transition: all 0.25s ease;
+}
+
+.progress-step.completed .step-bubble {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+}
+
+.progress-step.current .step-bubble {
+    background: var(--accent-light);
+    border-color: var(--accent);
+    color: #92400e;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+    animation: pulseStep 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseStep {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+
+.step-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+    max-width: 80px;
+}
+
+.progress-step.completed .step-label {
+    color: var(--primary-dark);
+}
+
+.progress-step.current .step-label {
+    color: var(--text-main);
+    font-weight: 800;
+}
+
+.progress-connector {
+    position: absolute;
+    top: 19px;
+    left: 8%;
+    right: 8%;
+    height: 3px;
+    background: #e2e8f0;
+    z-index: 1;
+}
+
+.progress-connector-fill {
+    height: 100%;
+    background: var(--primary);
+    transition: width 0.35s ease;
+}
+
+.auto-refresh-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 1rem;
+    padding-top: 0.65rem;
+    border-top: 1px dashed var(--border);
+}
+
+.refresh-pulse {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    margin-right: 0.4rem;
+    animation: pulseDot 1.5s infinite;
+}
+
+@keyframes pulseDot {
+    0% { transform: scale(0.9); opacity: 0.6; }
+    50% { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+.cancelled-order-banner {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius-sm);
+    margin: 1.25rem 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
 /* Responsive Media Queries */
 @media (max-width: 900px) {
     .order-layout {
